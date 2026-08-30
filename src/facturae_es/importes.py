@@ -1,12 +1,19 @@
-"""Dinero en Decimal, redondeado como manda Hacienda.
+"""Dinero en Decimal, con dos decimales y redondeo al alza en el medio punto.
 
 Dos decisiones que parecen menores y deciden si una factura la aceptan:
 
 1. **Nunca ``float``.** ``0.1 + 0.2`` da ``0.30000000000000004``. Sobre cien
    lineas eso es un descuadre de centimos, y el receptor rechaza el fichero.
-2. **``ROUND_HALF_UP``, no el redondeo de Python.** Python usa banquero por
-   defecto: ``round(2.5)`` da ``2``. En una factura, 2,5 son 3. El articulo
-   11 de la Ley 37/1992 (IVA) manda redondear al alza en el medio punto.
+2. **``ROUND_HALF_UP``, no el redondeo de Python.** Python usa el de banquero
+   por defecto: ``round(2.5)`` da ``2`` y ``round(3.5)`` da ``4``. En una
+   factura, 2,5 son 3.
+
+   Esto ultimo es la convencion comercial habitual, no una obligacion legal:
+   ni la Ley 37/1992 del IVA ni el Reglamento de facturacion fijan un modo de
+   redondeo para el importe de una factura. Lo exigible es el resultado --
+   dos decimales y totales que cuadren con las lineas -- y ``ROUND_HALF_UP``
+   es como se llega ahi sin que el redondeo de banquero meta diferencias de
+   centimos frente a lo que calcula el receptor.
 """
 
 from __future__ import annotations
