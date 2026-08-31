@@ -5,3 +5,8 @@ __pycache__/
 build/
 dist/
 .venv/
+
+# --- Artefactos de pruebas y estilo (no se versionan) ---
+.coverage
+.ruff_cache/
+htmlcov/
