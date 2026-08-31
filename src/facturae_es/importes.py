@@ -18,9 +18,9 @@ Dos decisiones que parecen menores y deciden si una factura la aceptan:
 
 from __future__ import annotations
 
-from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
-__all__ = ["DOS_DECIMALES", "a_decimal", "redondear", "formatear"]
+__all__ = ["DOS_DECIMALES", "a_decimal", "formatear", "redondear"]
 
 DOS_DECIMALES = Decimal("0.01")
 

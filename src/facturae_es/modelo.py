@@ -12,29 +12,29 @@ saltar la validacion del receptor.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal
-from typing import Sequence
 
 from .importes import a_decimal, redondear
 
 __all__ = [
-    "TipoPersona",
-    "TipoResidencia",
-    "ClaseFactura",
-    "TipoDocumento",
-    "Impuesto",
-    "Direccion",
-    "Emisor",
-    "Receptor",
-    "Linea",
-    "Factura",
-    "FacturaInvalida",
-    "IVA",
-    "IRPF",
     "IGIC",
     "IPSI",
+    "IRPF",
+    "IVA",
+    "ClaseFactura",
+    "Direccion",
+    "Emisor",
+    "Factura",
+    "FacturaInvalida",
+    "Impuesto",
+    "Linea",
+    "Receptor",
+    "TipoDocumento",
+    "TipoPersona",
+    "TipoResidencia",
 ]
 
 
@@ -103,7 +103,12 @@ class Impuesto:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "tipo", a_decimal(self.tipo))
-        if not (isinstance(self.codigo, str) and len(self.codigo) == 2 and self.codigo.isdigit()):
+        dos_digitos = (
+            isinstance(self.codigo, str)
+            and len(self.codigo) == 2
+            and self.codigo.isdigit()
+        )
+        if not dos_digitos:
             raise FacturaInvalida(
                 f"el codigo de impuesto {self.codigo!r} no es de dos digitos; "
                 f"el IVA es '01' y el IRPF '04'"
@@ -254,7 +259,8 @@ class Factura:
             raise FacturaInvalida("la factura necesita numero")
         if len(self.numero) > 20:
             raise FacturaInvalida(
-                f"InvoiceNumber admite 20 caracteres y {self.numero!r} tiene {len(self.numero)}"
+                f"InvoiceNumber admite 20 caracteres y {self.numero!r} "
+                f"tiene {len(self.numero)}"
             )
         if len(self.serie) > 20:
             raise FacturaInvalida("InvoiceSeriesCode admite 20 caracteres")
@@ -273,7 +279,7 @@ class Factura:
     @property
     def total_bruto(self) -> Decimal:
         """``TotalGrossAmount``: suma de las lineas antes de impuestos."""
-        return redondear(sum((l.bruto for l in self.lineas), Decimal(0)))
+        return redondear(sum((x.bruto for x in self.lineas), Decimal(0)))
 
     def _agrupar(self, retenidos: bool) -> list[tuple[Impuesto, Decimal, Decimal]]:
         """Impuestos agregados por codigo y tipo, con base y cuota sumadas.

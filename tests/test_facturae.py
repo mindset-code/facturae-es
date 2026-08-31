@@ -20,14 +20,14 @@ from decimal import Decimal
 import pytest
 
 from facturae_es import (
+    IRPF,
+    IVA,
     NS,
     ClaseFactura,
     Direccion,
     Emisor,
     Factura,
     FacturaInvalida,
-    IRPF,
-    IVA,
     Impuesto,
     Linea,
     Receptor,

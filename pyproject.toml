@@ -22,7 +22,10 @@ classifiers = [
 dependencies = []
 
 [project.optional-dependencies]
-dev = ["pytest>=7"]
+dev = ["pytest>=7", "pytest-cov>=4", "ruff>=0.6"]
+
+[project.scripts]
+facturae-es = "facturae_es.__main__:main"
 
 [project.urls]
 Homepage = "https://mindset-code.com"
@@ -33,3 +36,19 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.coverage.run]
+source = ["facturae_es"]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = ["pragma: no cover", 'if __name__ == .__main__.:']
+show_missing = true
+
+[tool.ruff]
+line-length = 95
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "C4", "RUF"]

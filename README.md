@@ -1,16 +1,25 @@
 # facturae-es
 
-**El formato oficial de factura electrónica española, generado desde Python y sin dependencias.**
+**Spain's official e-invoice format, generated from Python with zero dependencies.**
 
 [![tests](https://github.com/mindset-code/facturae-es/actions/workflows/tests.yml/badge.svg)](https://github.com/mindset-code/facturae-es/actions/workflows/tests.yml)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue)](https://www.python.org/)
-[![Licencia MIT](https://img.shields.io/badge/licencia-MIT-green)](LICENSE)
-[![Dependencias](https://img.shields.io/badge/dependencias-0-brightgreen)](pyproject.toml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)](pyproject.toml)
 
-El Real Decreto 238/2026 hace obligatoria la factura electrónica entre empresas:
-octubre de 2027 para quien factura más de ocho millones, octubre de 2028 para
-todos los demás. Eso deja a mucha gente escribiendo un XML de 190 KB de esquema
-a mano. Esta biblioteca lo genera.
+> 🇬🇧 English · 🇪🇸 [Versión en español](README.es.md)
+
+![facturae-es](docs/portada.png)
+
+Royal Decree 238/2026, of 25 March
+([BOE-A-2026-7295](https://www.boe.es/buscar/act.php?id=BOE-A-2026-7295)),
+develops mandatory e-invoicing between Spanish businesses and professionals.
+The deadlines are not counted from that decree: its fourth final provision ties
+them to the entry into force of the ministerial order developing the public
+invoicing solution — **twelve months** afterwards for businesses whose turnover
+exceeded 8 million euros the previous year, **twenty-four** for everyone else.
+Whenever that clock starts, a lot of people will need to emit Facturae XML.
+This library emits it.
 
 ```python
 from decimal import Decimal
@@ -18,126 +27,146 @@ from facturae_es import Direccion, Emisor, Factura, Linea, Receptor, generar
 
 factura = Factura(
     numero="001",
-    serie="2026",
-    emisor=Emisor("B12345674", "Talleres Ejemplo SL",
-                  Direccion("Calle Mayor 1", "08001", "Barcelona", "Barcelona")),
-    receptor=Receptor("A58818501", "Cliente Ejemplo SA",
-                      Direccion("Gran Via 100", "28013", "Madrid", "Madrid")),
-    lineas=[Linea("Servicio de consultoría", Decimal("10"), Decimal("100"))],
+    emisor=Emisor(
+        nif="B12345674",
+        nombre="Talleres Ejemplo SL",
+        direccion=Direccion("Calle Mayor 1", "08001", "Barcelona", "Barcelona"),
+    ),
+    receptor=Receptor(
+        nif="A58818501",
+        nombre="Cliente Ejemplo SA",
+        direccion=Direccion("Gran Via 100", "28013", "Madrid", "Madrid"),
+    ),
+    lineas=[Linea("Consultoría", cantidad=Decimal("10"), precio_unitario=Decimal("100"))],
 )
 
-print(factura.total)   # Decimal('1210.00')
+factura.total          # Decimal('1210.00')
 print(generar(factura))
 ```
 
-## Instalación
+## Install
 
 ```bash
 pip install git+https://github.com/mindset-code/facturae-es
 ```
 
-Python 3.9 o superior. Cero dependencias: solo `xml`, `decimal` y `dataclasses`
-de la biblioteca estándar. Entra en un proyecto ya montado sin pelearse con las
-versiones de nadie.
+Python 3.9+. Zero dependencies — `xml.etree.ElementTree` for the document,
+`decimal` for the arithmetic. Check the install with:
 
-## Los totales no se piden: se calculan
-
-El esquema oficial **no comprueba que los totales sumen**. Un fichero puede
-validar contra el XSD y aun así llevar una cifra equivocada, y el error aparece
-semanas después, en la contabilidad del cliente. Aquí `InvoiceTotal` sale de las
-líneas, así que no puede discrepar de ellas.
-
-```python
-factura.total_bruto         # suma de las líneas
-factura.total_repercutido   # IVA, IGIC…
-factura.total_retenido      # IRPF
-factura.total               # bruto + repercutido − retenido
+```bash
+facturae-es autocomprobar
 ```
 
-## Las trampas que resuelve
+## Totals are derived, never supplied
 
-Cada una tiene su test:
+There is no `total=` parameter. The total comes from the lines, the lines from
+quantity times price, the tax from the base:
 
-- **El orden de los elementos es parte del contrato.** El esquema usa
-  `xs:sequence`: poner `InvoiceClass` antes de `InvoiceDocumentType` invalida el
-  fichero aunque el contenido sea correcto, y el validador no dice cuál es el
-  elemento culpable. Nueve tests comparan el orden que generamos con el del XSD
-  descargado en vivo de facturae.gob.es. Si el Ministerio lo cambia, se entera el
-  CI, no un cliente.
-- **El namespace va en todos los elementos, no solo en la raíz.** Es el error
-  que produce un XML que se lee perfectamente y que ningún validador acepta.
-- **`float` no sirve para dinero.** `0.1 + 0.2` da `0.30000000000000004`. Todo
-  va en `Decimal`.
-- **Python redondea como un banquero y Hacienda no.** `round(2.5)` da `2`; en una
-  factura son `3`. Se usa `ROUND_HALF_UP` en todas partes.
-- **El IRPF resta, el IVA suma.** Las retenciones van en `TaxesWithheld` y los
-  repercutidos en `TaxesOutputs`. La biblioteca los separa sola por el código.
-- **Facturae agrupa impuestos por tipo, no por línea.** Dos líneas al 21 % son
-  un solo bloque `Tax`. Repetirlo por línea es motivo de rechazo.
-- **Exento no es «sin impuesto»**: es un bloque al 0 %. Una línea sin impuestos
-  se rechaza con el mensaje que dice qué escribir en su lugar.
-- **Persona física y jurídica no son intercambiables:** una lleva `Individual`
-  con nombre y apellidos separados; la otra, `LegalEntity` con la razón social.
-
-## La factura del autónomo
-
-Con IVA y retención a la vez, que es donde más se falla:
-
-```python
-from facturae_es import IRPF, IVA, Impuesto
-
-linea = Linea("Desarrollo", Decimal("40"), Decimal("65"), impuestos=[
-    Impuesto(IVA, Decimal("21")),
-    Impuesto(IRPF, Decimal("15")),
-])
-factura = Factura(numero="001", emisor=emisor, receptor=receptor, lineas=[linea])
-
-factura.total_bruto       # Decimal('2600.00')
-factura.total_repercutido # Decimal('546.00')
-factura.total_retenido    # Decimal('390.00')
-factura.total             # Decimal('2756.00')  ← lo que se cobra
+```
+total = Σ lines + Σ taxes charged − Σ withholdings
 ```
 
-## Firma
+An invoice whose stated total disagrees with its detail is not a rounding
+problem to fix later; it is a document that gets rejected. Making it
+underivable removes the failure mode entirely.
 
-El XML sale **sin firmar**, y eso es deliberado. Facturae exige firma XAdES para
-presentar ante una administración, y firmar requiere un certificado y una
-biblioteca criptográfica: meterla aquí obligaría a instalar `xmlsec` y `libxml2`
-a todo el que solo quiere generar el fichero.
+Everything is `Decimal`, rounded at each amount rather than once at the end, so
+`Σ lines == total_bruto` holds exactly.
 
-Para firmar, el XML que devuelve `generar()` se pasa a
-[`xmlsig`](https://pypi.org/project/xmlsig/) o a
-[AutoFirma](https://firmaelectronica.gob.es/), que es lo que usa la
-Administración. Si tu caso es firmar de forma desatendida en un servidor, ese es
-un problema distinto y con más aristas de las que parece: escríbenos.
+## From the command line
 
-## Alcance, y cuándo usar otra cosa
+```console
+$ facturae-es plantilla > factura.json     # a filled-in starting point
+$ facturae-es validar factura.json
+Factura A001 de 2026-01-15: válida.
+  Base         1250.00
+  + 01 al 21% sobre 1250.00:     262.50
+  - 04 al 15% sobre 1000.00:     150.00
+  TOTAL        1362.50 EUR
+$ facturae-es generar factura.json -o factura.xml
+```
 
-Esto genera **el XML de Facturae 3.2.2**. No firma, no envía a FACe y no
-gestiona los estados de la factura.
+Reads `-` from standard input, so it composes:
+`mi-erp exportar | facturae-es generar - > factura.xml`.
+Full reference: [docs/cli.md](docs/cli.md).
 
-- Si trabajas en **PHP**, [`josemmo/Facturae-PHP`](https://github.com/josemmo/Facturae-PHP)
-  es la referencia del ecosistema y hace además la firma y el envío.
-- Si necesitas la **huella encadenada de VERI\*FACTU**, está en
-  [verifactu-huella](https://github.com/mindset-code/pyverifactu-huella).
-- Si lo que buscas es **cuándo vence cada modelo**, está en
-  [calendario-fiscal-es](https://github.com/mindset-code/calendario-fiscal-es).
+## From a dict or JSON
 
-**No es asesoramiento fiscal.** Valida el fichero contra el validador oficial
-antes de emitir en producción.
+Most integrations do not have model objects; they have a row or a payload:
 
-## Fuentes
+```python
+from facturae_es import desde_dict, desde_json, a_dict
 
-- [Formato Facturae 3.2.2](https://www.facturae.gob.es/formato/Paginas/version-3-2.aspx) — Ministerio de Hacienda
-- [Esquema XSD oficial](https://www.facturae.gob.es/content/dam/facturae/formato/versiones/Facturaev3_2_2.xml) — el que descargan los tests
-- Real Decreto 238/2026, de 31 de marzo — desarrollo reglamentario de la factura electrónica B2B
-- Ley 18/2022, de 28 de septiembre, «Crea y Crece», artículo 12
+factura = desde_json(texto)
+datos = a_dict(factura)      # round-trips to the identical XML
+```
 
-## Contribuir
+**A misspelled key raises instead of being ignored.** A `precio_unitraio` that
+gets quietly dropped produces an invoice for zero euros and says nothing; this
+is the single most valuable thing the loader does. See [docs/json.md](docs/json.md).
 
-Los fallos y las propuestas van a [issues](https://github.com/mindset-code/facturae-es/issues).
-Si envías un cambio, acompáñalo de un test: aquí un campo mal puesto le cuesta
-una factura rechazada a alguien.
+## What it catches before you emit
+
+Each of these is enforced at construction, with a message that says what the
+schema expects:
+
+- **A Spanish postcode of four digits.** `"8001"` is what a spreadsheet does to
+  Barcelona's `"08001"`, and it is the most common data error of all.
+- **A country in alpha-2.** `ESP`, not `ES` — the schema wants ISO 3166-1
+  alpha-3.
+- **A line with no tax block.** If the operation is exempt, that is
+  `Impuesto(IVA, 0)` explicitly: the schema needs the block, and 0 % is a
+  different statement from silence.
+- **The same tax code twice on a line.** That is not two rates, it is a
+  double-count.
+- **A natural person with no surname.** Facturae keeps `Name` and
+  `FirstSurname` in separate elements; there is no full-name field.
+
+## Not signed
+
+The XML this produces is **valid and unsigned**. Facturae requires an XAdES
+signature before submission to FACe, and signing needs a certificate and a
+crypto library — neither of which belongs in a zero-dependency formatter.
+[docs/signing.md](docs/signing.md) explains the division of labour and what not
+to do to the bytes in between.
+
+## Documentation
+
+| Page | What is in it |
+|---|---|
+| [Getting started](docs/getting-started.md) | install, first invoice, why totals are derived |
+| [The invoice model](docs/invoice-model.md) | parties, lines, taxes, every validation and its reason |
+| [JSON format](docs/json.md) | every field, floats, the round trip |
+| [Command line](docs/cli.md) | each subcommand with real output |
+| [Signing and FACe](docs/signing.md) | what is missing to submit, and why |
+| [FAQ](docs/faq.md) | rounding, NIF check digits, the legal calendar |
+
+A runnable end-to-end example is in
+[`examples/facturacion_completa.py`](examples/facturacion_completa.py): build
+an invoice, check the totals, emit the XML, read it back to verify what was
+written, round-trip through JSON, and walk through five rejected inputs. The
+test suite runs it, so it cannot rot.
+
+## Scope
+
+It generates the **document**. It does not sign it, does not submit it, and
+does not validate against the official XSD at runtime — that would mean
+vendoring or fetching the schema. For the chained hash VERI\*FACTU requires of
+billing systems, a separate obligation, see
+[pyverifactu-huella](https://github.com/mindset-code/pyverifactu-huella).
+
+**This is not legal or tax advice.** Check the official sources before resting
+a real obligation on it.
+
+## Sources
+
+- [Facturae](https://www.facturae.gob.es/) — official format, schemas and documentation
+- [Real Decreto 238/2026, de 25 de marzo](https://www.boe.es/buscar/act.php?id=BOE-A-2026-7295) — mandatory B2B e-invoicing
+- Ley 18/2022 (Crea y Crece), which the decree develops
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ```bash
 git clone https://github.com/mindset-code/facturae-es
@@ -146,12 +175,12 @@ pip install -e ".[dev]"
 pytest -v
 ```
 
-## Licencia
+## License
 
-MIT — ver [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE).
 
 ---
 
-<sub>Mantenido por <a href="https://github.com/mindset-code">Mindset &amp; Code</a>. Si tienes que
-integrar Facturae, VERI\*FACTU o el envío a FACe en un sistema que ya está en
-marcha, escribe a contacto@mindset-code.com.</sub>
+<sub>Maintained by <a href="https://github.com/mindset-code">Mindset &amp; Code</a>. If you need
+e-invoicing wired into a system that is already running, write to
+contacto@mindset-code.com.</sub>

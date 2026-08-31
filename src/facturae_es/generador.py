@@ -19,8 +19,8 @@ fichero sin decir por que:
 from __future__ import annotations
 
 import xml.etree.ElementTree as ET
+from collections.abc import Iterable
 from decimal import Decimal
-from typing import Iterable
 
 from .importes import formatear
 from .modelo import Direccion, Factura, TipoPersona, _Parte
