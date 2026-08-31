@@ -119,7 +119,7 @@ gestiona los estados de la factura.
 - Si trabajas en **PHP**, [`josemmo/Facturae-PHP`](https://github.com/josemmo/Facturae-PHP)
   es la referencia del ecosistema y hace además la firma y el envío.
 - Si necesitas la **huella encadenada de VERI\*FACTU**, está en
-  [verifactu-huella](https://github.com/mindset-code/verifactu-huella).
+  [verifactu-huella](https://github.com/mindset-code/pyverifactu-huella).
 - Si lo que buscas es **cuándo vence cada modelo**, está en
   [calendario-fiscal-es](https://github.com/mindset-code/calendario-fiscal-es).
 
